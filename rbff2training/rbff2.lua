@@ -830,6 +830,7 @@ rbff2.startplugin  = function()
 		motion_stop          = 1, -- 1:OFF 2:1P 3:2P
 		motion_stop_act      = 0x48,
 		motion_stop_count    = 0x06,
+		motion_stop_frame    = -1,
 	}
 
 	-- DIPスイッチ
@@ -2722,6 +2723,8 @@ rbff2.startplugin  = function()
 				[0xF7] = function(data)  end,
 				[0xE7] = function(data) p.attackbits.fullhit, p.on_hit = data ~= 0, now() end,
 				[0xE9] = function(data) p.on_hit = now() end,
+				[0xB9] = function(data, ret) if p.mos_filter(0xB9, data, ret) then return end end,
+				[0xBA] = function(data, ret) if p.mos_filter(0xBA, data, ret) then return end end,
 				[0x8A] = function(data) p.parrieable1 = 0x2 >= data end,
 				[0xA3] = function(data) p.firing = data ~= 0 end, -- 攻撃中に値が入る ガード判断用
 			}
@@ -7270,7 +7273,14 @@ rbff2.startplugin  = function()
 			end
 		end
 
-		if global.motion_stop == (p.num + 1) and p.act == global.motion_stop_act and p.act_count == global.motion_stop_count then
+		if global.motion_stop == (p.num + 1) and
+			p.act == global.motion_stop_act and
+			(global.motion_stop_count == -1 or
+				(p.act_count == global.motion_stop_count and
+				 (global.motion_stop_frame == -1 or
+				  p.act_frame == global.motion_stop_frame)
+				)
+			)  then
 			if p.on_hit == global.frame_number or p.on_block == global.frame_number then
 				p.motion_stop = false
 			else
@@ -9628,7 +9638,7 @@ rbff2.startplugin  = function()
 		ut.new_filled_table(37, function() menu.on_disp(true) end))
 
 	menu.labels.motion_stops = {}
-	menu.labels.motion_stops2 = {}
+	menu.labels.motion_stops2 = { "OFF" }
 	for i = 0, 0x2FF do table.insert(menu.labels.motion_stops, string.format("%3X", i)) end
 	for i = 0, 0xFF do table.insert(menu.labels.motion_stops2, string.format("%2X", i)) end
 	menu.motion_stop = menu.create(
@@ -9636,7 +9646,8 @@ rbff2.startplugin  = function()
 		"状態表示 小表示 で確認できるIDを指定して該当するモーションを停止します。",
 		{
 			{ "ACT", menu.labels.motion_stops, },
-			{ "COUNT", menu.labels.motion_stops2, },
+			{ "COUNT1", menu.labels.motion_stops2, },
+			{ "COUNT2", menu.labels.motion_stops2, },
 			{ "1P 状態表示", { "OFF", "ON", "ON:小表示", "ON:フラグ表示", "ON:ALL" }, },
 			{ "2P 状態表示", { "OFF", "ON", "ON:小表示", "ON:フラグ表示", "ON:ALL" }, },
 		},
@@ -9644,16 +9655,18 @@ rbff2.startplugin  = function()
 			---@diagnostic disable-next-line: undefined-field
 			local col, p, g = menu.motion_stop.pos.col, players, global
 			col[1] = g.motion_stop_act + 1
-			col[2] = g.motion_stop_count + 1
-			col[3] = p[1].disp_state                                   --  3 1P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
-			col[4] = p[2].disp_state                                   --  4 2P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
+			col[2] = g.motion_stop_count + 2
+			col[3] = g.motion_stop_frame + 2
+			col[4] = p[1].disp_state                                   --  4 1P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
+			col[5] = p[2].disp_state                                   --  5 2P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
 		end,
-		ut.new_filled_table(4, function(on_a1, cancel)
+		ut.new_filled_table(5, function(on_a1, cancel)
 			local col, row, p, g = menu.motion_stop.pos.col, menu.motion_stop.pos.row, players, global
 			g.motion_stop_act     = col[1] - 1
-			g.motion_stop_count   = col[2] - 1
-			p[1].disp_state       = col[3]                             --  3 1P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
-			p[2].disp_state       = col[4]                             --  4 2P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
+			g.motion_stop_count   = col[2] - 2
+			g.motion_stop_frame   = col[3] - 2
+			p[1].disp_state       = col[4]                             --  4 1P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
+			p[2].disp_state       = col[5]                             --  5 2P 状態表示  1:OFF 2:ON, ON:小表示, ON:大表示, ON:フラグ表示
 			menu.set_current()
 		end))
 	menu.on_extra    = function(cancel)
