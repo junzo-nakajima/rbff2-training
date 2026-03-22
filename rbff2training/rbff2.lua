@@ -2583,6 +2583,11 @@ rbff2.startplugin  = function()
 				p.on_bs_check = now()
 				if p.hook ~= p.bs_hook then
 					if p.rvs_hook_wp then ret.value = 0x00 end -- 自動BS以外の発動を阻止
+				else
+					local sp = p.hook
+					if sp and sp.ver and sp.id then
+						ret.value = sp.id
+					end -- 2Fガードストップの自動BS判断にも対応させる
 				end
 			end, -- BSの技IDチェック
 			[0xBB] = function(data, ret)
@@ -3344,14 +3349,14 @@ rbff2.startplugin  = function()
 				[{ addr = 0x67, filter = 0x012D14 }] = p.save_range_pos, -- 1P押し合い判定処理フック
 				[{ addr = 0xA9, filter = 0x05C2B4 }] = p.save_box_pos, -- 当たり判定処理フック
 				--[{ addr = 0xB1, filter = 0x05C2FE }] = p.save_box_pos, -- 当たり判定処理フック
-				[{ addr = 0xA3, filter = 0x03944C }] = p.apply_sp_hook,
+				[{ addr = 0xA3, filter = 0x03944C }] = p.apply_sp_hook, -- 03944C:コマンドチェック
 			})
 		elseif p.num == 2 then
 			p.rp08 = ut.hash_add_all(p.rp08, {
 				[{ addr = 0x67, filter = 0x012D5E }] = p.save_range_pos, -- 2P押し合い判定処理フック
 				[{ addr = 0xA9, filter = 0x05C2CC }] = p.save_box_pos, -- 当たり判定処理フック
 				--[{ addr = 0xB1, filter = 0x05C2FE }] = p.save_box_pos, -- 当たり判定処理フック
-				[{ addr = 0xA3, filter = 0x03944C }] = p.apply_sp_hook,
+				[{ addr = 0xA3, filter = 0x03944C }] = p.apply_sp_hook, -- 03944C:コマンドチェック
 			})
 		end
 		table.insert(wps.all, p)
@@ -6777,12 +6782,13 @@ rbff2.startplugin  = function()
 	end
 	tra_sub.controll_dummy_breakshot = function(p)
 		local bs_hook = get_next_bs(p) -- キャラごとのBS候補を抽選取得
+		local on_block = p.on_block == global.frame_number
 
 		-- BS
-		if not p.gd_bs_enabled and p.bs and bs_hook and p.on_block == global.frame_number then
+		if not p.gd_bs_enabled and p.bs and bs_hook and on_block then
 			p.bs_count = (p.bs_count < 1) and 1 or p.bs_count + 1
 			if global.bs_hook_cnt <= p.bs_count and bs_hook then p.gd_bs_enabled, p.bs_count = true, -1 end
-			-- ut.printf("%s bs %s %s", p.num, p.bs_count, p.gd_bs_enabled)
+			--ut.printf("p%s bs_count=%s gd_bs_enabled=%s in_block=%s", p.num, p.bs_count, p.gd_bs_enabled, p.in_block)
 		elseif p.gd_bs_enabled and p.state ~= 2 then
 			p.gd_bs_enabled = false
 		end -- ガード状態が解除されたらBS解除
@@ -6792,6 +6798,11 @@ rbff2.startplugin  = function()
 			bs_hook = nil
 		end
 
+		--[[
+		if on_block and bs_hook then
+			ut.printf("BS %s p%s bs_count=%s gd_bs_enabled=%s in_block=%s", global.frame_number, p.num, p.bs_count, p.gd_bs_enabled, p.in_block)
+		end
+		]]
 		return bs_hook
 	end
 	tra_sub.controll_dummy_fwd_prov = function(p)
@@ -7315,6 +7326,7 @@ rbff2.startplugin  = function()
 		if bs_hook then
 			p.bs_hook = bs_hook
 			p.input_any(bs_hook, "bs_hook")
+p.apply_sp_hook()
 			return
 		end
 		if rvs_hook then
