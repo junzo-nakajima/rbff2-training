@@ -2221,13 +2221,40 @@ rbff2.startplugin  = function()
 				--	if p.rvs_hook_wp then p.input_any(p.rvs_hook_wp, "[Reversal] 0x8E hook") end
 				--end
 				local changed, n = p.state ~= data, now()
-				p.on_block = data == 2 and n or p.on_block                                     -- ガードへの遷移フレームを記録
+				local data2 = data == 2
+				p.on_block = data2 and n or p.on_block                                         -- ガードへの遷移フレームを記録
 				p.on_hit = (data == 1 or data == 3) and n or p.on_hit                          -- ヒットへの遷移フレームを記録
 				if p.state == 0 and p.on_hit == n and not p.act_data.neutral then p.on_punish = n end -- カウンターor確定反撃
 				p.state, p.change_state = data, changed and n or p.change_state                -- 今の状態と状態更新フレームを記録
-				if data == 2 or (data == 3 and p.old.state == 0) then
+				if data2 or (data == 3 and p.old.state == 0) then
 					p.update_tmp_combo(changed and 1 or 2)                                     -- 連続ガード用のコンボ状態リセット
 					p.last_combo = changed and 1 or p.last_combo + 1
+				end
+
+				local bs_hook = get_next_bs(p) -- キャラごとのBS候補を抽選取得
+				-- BS
+				if not p.gd_bs_enabled and p.bs and bs_hook and data2 then
+					p.bs_count = (p.bs_count < 1) and 1 or p.bs_count + 1
+					if global.bs_hook_cnt <= p.bs_count and bs_hook then p.gd_bs_enabled, p.bs_count = true, -1 end
+				elseif p.gd_bs_enabled and p.state ~= 2 then
+					p.gd_bs_enabled = false
+				end -- ガード状態が解除されたらBS解除
+
+				-- 現フレームのBS要否確認
+				if p.in_block ~= true or p.gd_bs_enabled ~= true then
+					bs_hook = nil
+				end
+				if bs_hook then
+					local sp = bs_hook
+					-- BS発動時はその他自動動作を抑止する
+					if sp.ver then
+						mem.w08(p.addr.base + 0xA3, sp.id)
+						mem.w16(p.addr.base + 0xA4, sp.ver)
+					elseif sp.f then
+						mem.w08(p.addr.base + 0xD6, sp.id)
+						mem.w08(p.addr.base + 0xD7, sp.f)
+					end
+					--ut.printf("BS p%s bs_count=%s gd_bs_enabled=%s in_block=%s", p.num, p.bs_count, p.gd_bs_enabled, p.in_block)
 				end
 			end,
 			[{ addr = 0x8F, filter = { 0x5B134, 0x5B154 } }] = function(data)
@@ -2583,11 +2610,6 @@ rbff2.startplugin  = function()
 				p.on_bs_check = now()
 				if p.hook ~= p.bs_hook then
 					if p.rvs_hook_wp then ret.value = 0x00 end -- 自動BS以外の発動を阻止
-				else
-					local sp = p.hook
-					if sp and sp.ver and sp.id then
-						ret.value = sp.id
-					end -- 2Fガードストップの自動BS判断にも対応させる
 				end
 			end, -- BSの技IDチェック
 			[0xBB] = function(data, ret)
@@ -7320,15 +7342,14 @@ rbff2.startplugin  = function()
 			5. 通常動作モードにガード方向を追加する
 		]]
 		-- BS判定 回数の状態管理もあるので実施必須
-		local bs_hook = tra_sub.controll_dummy_breakshot(p)
+		--local bs_hook = tra_sub.controll_dummy_breakshot(p)
 		-- リバーサル判定 回数の状態管理もあるので実施必須
 		local rvs_hook, rvs_log, reset_rvs = tra_sub.controll_dummy_reversal(p)
-		if bs_hook then
-			p.bs_hook = bs_hook
-			p.input_any(bs_hook, "bs_hook")
-p.apply_sp_hook()
-			return
-		end
+		--if bs_hook then
+		--	p.bs_hook = bs_hook
+		--	p.input_any(bs_hook, "bs_hook")
+		--	return
+		--end
 		if rvs_hook then
 			p.rvs_hook = rvs_hook
 			if reset_rvs then p.reset_cmd_hook(reset_rvs, rvs_log) end
