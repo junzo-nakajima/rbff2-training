@@ -2510,6 +2510,13 @@ rbff2.startplugin  = function()
 				if (0x80 & data) > 0 then p[wk] = now() else p[rk] = now() end
 			end
 		end
+		local throw_a0 = { -- 投げ間合い判断用
+			[0x05CD70] = true, -- その他
+			[0x05D14A] = true, --ダック
+			[0x05D38A] = true, --タン
+			[0x05DD78] = true, --ギース、ビリー
+			[0x05DFF2] = true, -- チン、ホンフゥ
+		}
 		p.rp08                     = {
 			[{ addr = 0x12, filter = { 0x3DCF8, 0x49B2C } }] = function(data, ret)
 				if p.enc_enabled then
@@ -2564,7 +2571,8 @@ rbff2.startplugin  = function()
 			end,
 			--[{ addr = 0x8A, filter = 0x2FAA8 }] = function(data) p.readed_ca = mem.rg("A0", 0xFFFFFF) end,
 			[{ addr = 0x8E, filter = 0x39F8A }] = function(data)
-				if is_ready_match_p() and 0x05CD70 == mem.rg("A0") then add_throw_box(p.op, get_normal_throw_box(p.op)) end -- 通常投げ
+				--ut.printf("%s %X %X", now(), data, mem.rg("A0"))
+				if is_ready_match_p() and throw_a0[mem.rg("A0")] then add_throw_box(p.op, get_normal_throw_box(p.op)) end -- 通常投げ
 			end,
 			[{ addr = 0x8F, filter = 0x5B41E }] = function(data, ret)
 				-- 残体力を攻撃力が上回ると気絶値が加算がされずにフックが失敗するので、残体力より大きい値を返さないようにもする
