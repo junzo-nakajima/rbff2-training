@@ -2241,8 +2241,9 @@ rbff2.startplugin  = function()
 				end -- ガード状態が解除されたらBS解除
 
 				-- 現フレームのBS要否確認
-				if p.in_block ~= true or p.gd_bs_enabled ~= true then
+				if (p.in_block ~= true and p.on_block ~= true and data2 ~= true) or p.gd_bs_enabled ~= true then
 					bs_hook = nil
+					--ut.printf("%s %s %s %s %s", now(), "cls_bs_hook", data, p.in_block, p.gd_bs_enabled)
 				end
 				if bs_hook then
 					local sp = bs_hook
@@ -2615,7 +2616,7 @@ rbff2.startplugin  = function()
 				if ac[p.base] == data then p.on_additional_wsp = now() elseif ac[p.base] then p.on_additional_rsp = now() end
 			end,
 			[{ addr = 0xB9, filter = { 0x396B4, 0x39756 } }] = function(data, ret)
-				p.on_bs_check = now()
+				--p.on_bs_check = now()
 				if p.hook ~= p.bs_hook then
 					if p.rvs_hook_wp then ret.value = 0x00 end -- 自動BS以外の発動を阻止
 				end
