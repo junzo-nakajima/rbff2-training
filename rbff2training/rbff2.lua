@@ -2273,16 +2273,17 @@ rbff2.startplugin  = function()
 			[0xA2] = function(data) p.firing = data ~= 0 end,                                     -- 弾発射時に値が入る ガード判断用
 			[0xA3] = function(data)                                                               -- A3:成立した必殺技コマンドID
 				if not p.char_data then return end
+				local now, pc = now(), mem.pc()
 				if data == 0 then
-					p.on_sp_clear = now()
+					p.on_sp_clear = now
 				elseif data ~= 0 then
-					if mem.pc() == 0x395B2 then p.on_sp_established = now() end
+					if pc == 0x395B2 then p.on_sp_established = now end
 					p.last_sp = data
 				end
-				if mem.pc() == 0x395B2 then
+				if pc == 0x395B2 then
 					local count = mem.rg("D0", 0xFFFF) + 1
 					local exp = mem.r16(mem.rg("A6", 0xFFFFF) + 1) -- 追加データ
-					if data ~= 0 or exp ~= 0 then p.add_sp_establish_hist(data, exp, count, now()) end
+					if data ~= 0 or exp ~= 0 then p.add_sp_establish_hist(data, exp, count, now) end
 				end
 			end,
 			-- A4:必殺技コマンドの持続残F ?
@@ -2493,21 +2494,27 @@ rbff2.startplugin  = function()
 			{ [0x2AA9A] = 0x0B --[[66A]], id = ut.new_set(0x0B) }, -- 李香緋
 			{}, -- アルフレッド
 		}
+		local button_rkeys = {
+			[1] = "on_additional_r1",
+			[5] = "on_additional_r5",
+		}
+		local button_wkeys = {
+			[1] = "on_additional_w1",
+			[5] = "on_additional_w5",
+		}
 		local check_add_button     = function(data, btn_frame)
 			--ut.printf("%sF %X %X %X %X", btn_frame, data, mem.pc(), p.base, mem.r16(p.addr.base + 0xFE))
 			local simple = additional_buttons[p.base]
-			local wk, rk = string.format("on_additional_w%s", btn_frame), string.format("on_additional_r%s", btn_frame)
+			local wk, rk = button_wkeys[btn_frame], button_rkeys[btn_frame]
 			if simple then
 				if (simple & data) > 0 then p[wk] = now() else p[rk] = now() end
 				return
 			end
 			if p.base == 0x03DE38 and mem.r16(p.addr.base + 0xFE) ~= 0 then -- 飛燕失脚CA C
 				if (0x40 & data) > 0 then p[wk] = now() else p[rk] = now() end
-			end
-			if p.base == 0x04213C and (p.act == 0x87 or p.act == 0x91 or p.act == 0x9B) then -- 蛇だまし
+			elseif p.base == 0x04213C and (p.act == 0x87 or p.act == 0x91 or p.act == 0x9B) then -- 蛇だまし
 				if (0x80 & data) > 0 then p[wk] = now() else p[rk] = now() end
-			end
-			if p.base == 0x049CD2 and p.act == 0x9C then -- フェイクブラスト
+			elseif p.base == 0x049CD2 and p.act == 0x9C then -- フェイクブラスト
 				if (0x80 & data) > 0 then p[wk] = now() else p[rk] = now() end
 			end
 		end

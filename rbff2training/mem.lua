@@ -22,6 +22,7 @@
 local ut         = require("rbff2training/util")
 local man        = manager
 local machine    = man.machine
+local video      = machine.video
 local cpu        = machine.devices[":maincpu"]
 local pgm        = cpu.spaces["program"]
 local safe_cb          = function(cb)
@@ -57,6 +58,10 @@ local countup          = function(label)
     count = count + 1
     return count
 end
+local tap_countup      = function(cnt)
+    return (cnt or 0) + 1
+    --return (video.speed_percent < 0.96) and ((cnt or 0) + 1) or cnt
+end
 local holder           = nil
 mem.rg                 = function(id, mask) return (mask == nil) and cpu.state[id].value or (cpu.state[id].value & mask) end
 mem.pc                 = function() return cpu.state["CURPC"].value end
@@ -69,7 +74,7 @@ mem.wp08               = function(addr, cb, filter)
     if addr % 2 == 0 then
         holder.taps[name] = mem.wp(addr, addr + 1, name,
             function(offset, data, mask)
-                mem.wp_cnt[addr] = (mem.wp_cnt[addr] or 0) + 1
+                mem.wp_cnt[addr] = tap_countup(mem.wp_cnt[addr])
                 if filter and filter[mem.pc()] ~= true then return data end
                 local ret = {}
                 if mask > 0xFF then
@@ -90,7 +95,7 @@ mem.wp08               = function(addr, cb, filter)
     else
         holder.taps[name] = mem.wp(addr - 1, addr, name,
             function(offset, data, mask)
-                mem.wp_cnt[addr] = (mem.wp_cnt[addr] or 0) + 1
+                mem.wp_cnt[addr] = tap_countup(mem.wp_cnt[addr])
                 if filter and filter[mem.pc()] ~= true then return data end
                 local ret = {}
                 if mask == 0xFF or mask == 0xFFFF then
@@ -112,7 +117,7 @@ mem.wp16               = function(addr, cb, filter)
     holder.taps[name] = mem.wp(addr, addr + 1, name,
         function(offset, data, mask)
             local ret = {}
-            mem.wp_cnt[addr] = (mem.wp_cnt[addr] or 0) + 1
+            mem.wp_cnt[addr] = tap_countup(mem.wp_cnt[addr])
             if filter and filter[mem.pc()] ~= true then return data end
             if mask == 0xFFFF then
                 cb(data & mask, ret)
@@ -138,7 +143,7 @@ mem.wp32               = function(addr, cb, filter)
     local name = string.format("wp32_%x_%s", addr, num)
     holder.taps[name] = mem.wp(addr, addr + 3, name,
         function(offset, data, mask)
-            mem.wp_cnt[addr] = (mem.wp_cnt[addr] or 0) + 1
+            mem.wp_cnt[addr] = tap_countup(mem.wp_cnt[addr])
             if filter and filter[mem.pc()] ~= true then return data end
             local ret = {}
             --ut.printf("wp32-1 %x %x %x %x %x", addr, offset, data, data, mask, ret.value or 0)
@@ -167,7 +172,7 @@ mem.rp08               = function(addr, cb, filter)
     if addr % 2 == 0 then
         holder.taps[name] = mem.rp(addr, addr + 1, name,
             function(offset, data, mask)
-                mem.rp_cnt[addr] = (mem.wp_cnt[addr] or 0) + 1
+                mem.rp_cnt[addr] = tap_countup(mem.rp_cnt[addr])
                 if filter and filter[mem.pc()] ~= true then return data end
                 local ret = {}
                 if mask > 0xFF then
@@ -188,7 +193,7 @@ mem.rp08               = function(addr, cb, filter)
     else
         holder.taps[name] = mem.rp(addr - 1, addr, name,
             function(offset, data, mask)
-                mem.rp_cnt[addr] = (mem.wp_cnt[addr] or 0) + 1
+                mem.rp_cnt[addr] = tap_countup(mem.rp_cnt[addr])
                 if filter and filter[mem.pc()] ~= true then return data end
                 local ret = {}
                 if mask == 0xFF or mask == 0xFFFF then
@@ -209,7 +214,7 @@ mem.rp16               = function(addr, cb, filter)
     local name = string.format("rp16_%x_%s", addr, num)
     holder.taps[name] = mem.rp(addr, addr + 1, name,
         function(offset, data, mask)
-            mem.rp_cnt[addr] = (mem.rp_cnt[addr] or 0) + 1
+            mem.rp_cnt[addr] = tap_countup(mem.rp_cnt[addr])
             if filter and filter[mem.pc()] ~= true then return data end
             local ret = {}
             if offset == addr then cb(data, ret) end
@@ -223,7 +228,7 @@ mem.rp32               = function(addr, cb, filter)
     local name = string.format("rp32_%x_%s", addr, num)
     holder.taps[name] = mem.rp(addr, addr + 3, name,
         function(offset, data, mask)
-            mem.rp_cnt[addr] = (mem.rp_cnt[addr] or 0) + 1
+            mem.rp_cnt[addr] = tap_countup(mem.rp_cnt[addr])
             if filter and filter[mem.pc()] ~= true then return data end
             if offset == addr then cb(data << 0x10 | mem.r16(addr + 2)) end -- r32を行うと再起でスタックオーバーフローエラーが発生する
             return data
